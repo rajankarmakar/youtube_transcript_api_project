@@ -23,7 +23,7 @@ def _build_api() -> YouTubeTranscriptApi:
             proxy_username=webshare_user,
             proxy_password=webshare_pass,
         )
-        return YouTubeTranscriptApi(proxies=proxy_config)
+        return YouTubeTranscriptApi(proxy_config=proxy_config)
 
     print("[Transcript] WARNING: No proxy configured. YouTube may block requests.")
     return YouTubeTranscriptApi()
