@@ -1,3 +1,8 @@
+"""
+Service layer for YouTube transcript fetching.
+Uses Webshare proxy to avoid YouTube IP blocks on cloud servers.
+"""
+import os
 from youtube_transcript_api import (
     YouTubeTranscriptApi,
     TranscriptsDisabled,
@@ -5,9 +10,26 @@ from youtube_transcript_api import (
     VideoUnavailable,
     CouldNotRetrieveTranscript,
 )
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
-# Instantiate once — v1.x uses instance methods, not static methods
-_api = YouTubeTranscriptApi()
+
+def _build_api() -> YouTubeTranscriptApi:
+    webshare_user = os.getenv("WEBSHARE_USERNAME")
+    webshare_pass = os.getenv("WEBSHARE_PASSWORD")
+
+    if webshare_user and webshare_pass:
+        print("[Transcript] Using Webshare proxy.")
+        proxy_config = WebshareProxyConfig(
+            proxy_username=webshare_user,
+            proxy_password=webshare_pass,
+        )
+        return YouTubeTranscriptApi(proxies=proxy_config)
+
+    print("[Transcript] WARNING: No proxy configured. YouTube may block requests.")
+    return YouTubeTranscriptApi()
+
+
+_api = _build_api()
 
 
 class TranscriptService:
@@ -17,7 +39,6 @@ class TranscriptService:
         transcript_list = _api.list(video_id)
 
         available = {"manual": [], "auto_generated": []}
-
         for transcript in transcript_list:
             entry = {
                 "language": transcript.language,
@@ -36,8 +57,6 @@ class TranscriptService:
     def get_default_transcript(video_id: str) -> dict:
         transcript_list = _api.list(video_id)
 
-        # Prefer manually created, fall back to auto-generated
-        transcript = None
         try:
             transcript = transcript_list.find_manually_created_transcript(
                 [t.language_code for t in transcript_list]
@@ -72,7 +91,6 @@ class TranscriptService:
         try:
             transcript = transcript_list.find_transcript([language_code])
         except NoTranscriptFound:
-            # Try translation fallback
             for t in transcript_list:
                 if t.is_translatable:
                     transcript = t.translate(language_code)
